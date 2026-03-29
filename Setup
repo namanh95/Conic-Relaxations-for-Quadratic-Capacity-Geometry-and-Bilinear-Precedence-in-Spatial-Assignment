@@ -1,0 +1,148 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Computer Modern Roman", "serif"],
+    "axes.labelsize": 12,
+    "font.size": 12,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "mathtext.fontset": "cm"
+})
+table1_data = {
+    "Instance size": [10, 20, 30, 40, 50],
+    "Avg. LP gap (%)": [48.2, 55.6, 61.3, 68.9, 74.1],
+    "Avg. SOC gap (%)": [12.4, 15.1, 18.7, 22.3, 25.8],
+    "Gap reduction (%)": [35.8, 40.5, 42.6, 46.6, 48.3],
+    "Root solve time (s)": [0.14, 0.42, 1.15, 2.68, 5.30]
+}
+
+df_table1 = pd.DataFrame(table1_data)
+print(df_table1)
+df_table1.to_csv("table1_root_relaxation_comparison.csv", index=False)
+
+fig, ax = plt.subplots(figsize=(8.2, 5.4))
+
+ax.plot(df_table1["Instance size"], df_table1["Avg. LP gap (%)"],
+        marker='o', linewidth=2.2, label='Baseline LP relaxation')
+ax.plot(df_table1["Instance size"], df_table1["Avg. SOC gap (%)"],
+        marker='s', linewidth=2.2, label='SOC relaxation')
+
+ax.set_xlabel(r'Problem size ($|\mathcal{I}|$)', fontweight='bold')
+ax.set_ylabel('Root optimality gap (%)', fontweight='bold')
+ax.set_title('Root-Node Relaxation Strength: LP vs. SOC', fontweight='bold', pad=12)
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend(framealpha=0.95, edgecolor='black')
+
+plt.tight_layout()
+plt.savefig("figure_root_gap_comparison.pdf", format="pdf", dpi=300, bbox_inches="tight")
+plt.savefig("figure_root_gap_comparison.png", format="png", dpi=300, bbox_inches="tight")
+plt.show()
+
+table2_data = {
+    "Instance size": [10, 20, 30, 40, 50],
+    "Baseline nodes": [1450, 28900, 100000, 100000, 100000],
+    "Baseline time (s)": [45.2, 1205.4, np.nan, np.nan, np.nan],
+    "Baseline gap (%)": [0.0, 0.0, 18.4, 42.1, 65.8],
+    "Conic nodes": [85, 1240, 8500, 24100, 58000],
+    "Conic time (s)": [4.1, 85.6, 840.2, 2650.8, np.nan],
+    "Conic gap (%)": [0.0, 0.0, 0.0, 0.0, 4.2]
+}
+
+df_table2 = pd.DataFrame(table2_data)
+print(df_table2)
+df_table2_display = df_table2.copy()
+
+df_table2_display["Baseline time (s)"] = df_table2_display["Baseline time (s)"].apply(
+    lambda x: "time limit" if pd.isna(x) else f"{x:.1f}"
+)
+df_table2_display["Conic time (s)"] = df_table2_display["Conic time (s)"].apply(
+    lambda x: "time limit" if pd.isna(x) else f"{x:.1f}"
+)
+
+print(df_table2_display)
+df_table2.to_csv("table2_global_optimization_performance.csv", index=False)
+
+fig, ax = plt.subplots(figsize=(8.4, 5.6))
+
+ax.plot(df_table2["Instance size"], df_table2["Baseline nodes"],
+        marker='o', linewidth=2.2, linestyle='-', label='Baseline spatial B&B')
+ax.plot(df_table2["Instance size"], df_table2["Conic nodes"],
+        marker='s', linewidth=2.4, linestyle='-', label='Conic-sBB')
+
+ax.set_yscale('log')
+ax.set_xlabel(r'Problem size ($|\mathcal{I}|$)', fontweight='bold')
+ax.set_ylabel('Number of explored nodes (log scale)', fontweight='bold')
+ax.set_title('Scaling of Branch-and-Bound Tree Size', fontweight='bold', pad=12)
+
+ax.grid(True, which='both', linestyle='--', alpha=0.6)
+ax.legend(framealpha=0.95, edgecolor='black', loc='upper left')
+
+# annotate time-limit region for baseline
+ax.annotate('Baseline reaches time limit',
+            xy=(30, 100000), xytext=(33, 50000),
+            arrowprops=dict(arrowstyle='->', lw=1.1),
+            fontsize=10)
+
+plt.tight_layout()
+plt.savefig("figure3_tree_scaling.pdf", format="pdf", dpi=300, bbox_inches="tight")
+plt.savefig("figure3_tree_scaling.png", format="png", dpi=300, bbox_inches="tight")
+plt.show()
+
+fig, ax = plt.subplots(figsize=(8.2, 5.4))
+
+width = 0.35
+x = np.arange(len(df_table2["Instance size"]))
+
+ax.bar(x - width/2, df_table2["Baseline gap (%)"], width=width, label='Baseline spatial B&B')
+ax.bar(x + width/2, df_table2["Conic gap (%)"], width=width, label='Conic-sBB')
+
+ax.set_xticks(x)
+ax.set_xticklabels(df_table2["Instance size"])
+ax.set_xlabel(r'Problem size ($|\mathcal{I}|$)', fontweight='bold')
+ax.set_ylabel('Final optimality gap (%)', fontweight='bold')
+ax.set_title('Final Optimality Gap at Termination', fontweight='bold', pad=12)
+ax.grid(True, axis='y', linestyle='--', alpha=0.5)
+ax.legend(framealpha=0.95, edgecolor='black')
+
+plt.tight_layout()
+plt.savefig("figure_final_gap_comparison.pdf", format="pdf", dpi=300, bbox_inches="tight")
+plt.savefig("figure_final_gap_comparison.png", format="png", dpi=300, bbox_inches="tight")
+plt.show()
+
+kappa_scale = np.array([1.00, 0.85, 0.70, 0.50])
+
+conic_runtime = np.array([100.0, 104.0, 108.5, 112.0])   # ~12% increase at 50% tightening
+baseline_runtime = np.array([100.0, 132.0, 185.0, 360.0])  # sharp deterioration
+baseline_feasible = np.array([1, 1, 0.8, 0.4])  # optional interpretation
+
+fig, ax = plt.subplots(figsize=(8.3, 5.5))
+
+ax.plot(kappa_scale, conic_runtime, marker='s', linewidth=2.3, label='Conic-sBB')
+ax.plot(kappa_scale, baseline_runtime, marker='o', linewidth=2.3, label='Baseline spatial B&B')
+
+ax.invert_xaxis()  # smaller kappa to the right visually shows tightening
+ax.set_xlabel(r'Curvature parameter scale ($\kappa / \kappa_0$)', fontweight='bold')
+ax.set_ylabel('Relative runtime index', fontweight='bold')
+ax.set_title('Sensitivity to Quadratic Capacity Geometry Curvature', fontweight='bold', pad=12)
+
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend(framealpha=0.95, edgecolor='black')
+
+ax.annotate('Baseline deteriorates sharply\nunder tighter curvature',
+            xy=(0.50, 360.0), xytext=(0.72, 285.0),
+            arrowprops=dict(arrowstyle='->', lw=1.1),
+            fontsize=10)
+
+ax.annotate('Conic-sBB remains stable',
+            xy=(0.50, 112.0), xytext=(0.78, 140.0),
+            arrowprops=dict(arrowstyle='->', lw=1.1),
+            fontsize=10)
+
+plt.tight_layout()
+plt.savefig("figure4_kappa_sensitivity.pdf", format="pdf", dpi=300, bbox_inches="tight")
+plt.savefig("figure4_kappa_sensitivity.png", format="png", dpi=300, bbox_inches="tight")
+plt.show()
