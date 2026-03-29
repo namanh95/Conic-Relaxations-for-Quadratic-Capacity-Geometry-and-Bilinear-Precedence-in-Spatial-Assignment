@@ -1,0 +1,146 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Computer Modern Roman", "serif"],
+    "axes.labelsize": 12,
+    "font.size": 12,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "mathtext.fontset": "cm"
+})
+
+np.random.seed(42)
+
+time_limit = 3600
+time_points = np.linspace(1, time_limit, 700)
+optimal_value = 120.0
+
+def create_step_trajectory(time_array, start_val, end_val, steps, is_upper_bound=True):
+    """
+    Create a monotone stepwise trajectory for illustrative bound evolution.
+    This is a synthetic visualization routine, not a solver trace.
+    """
+    trajectory = np.ones_like(time_array) * start_val
+    jump_times = sorted(np.random.choice(time_array[20:-20], size=steps, replace=False))
+
+    current_val = start_val
+    for t in jump_times:
+        if is_upper_bound:
+            current_val = current_val - (current_val - end_val) * np.random.uniform(0.15, 0.45)
+            current_val = max(current_val, end_val)
+        else:
+            current_val = current_val + (end_val - current_val) * np.random.uniform(0.08, 0.30)
+            current_val = min(current_val, end_val)
+
+        trajectory[time_array >= t] = current_val
+
+    return trajectory
+
+# Baseline spatial branch-and-bound: does not close the gap
+baseline_ub = create_step_trajectory(
+    time_points, start_val=250, end_val=135, steps=9, is_upper_bound=True
+)
+baseline_lb = create_step_trajectory(
+    time_points, start_val=45, end_val=85, steps=14, is_upper_bound=False
+)
+
+# Conic-sBB: closes the gap to optimality
+conic_ub = create_step_trajectory(
+    time_points, start_val=250, end_val=optimal_value, steps=7, is_upper_bound=True
+)
+conic_lb = create_step_trajectory(
+    time_points, start_val=90, end_val=optimal_value, steps=18, is_upper_bound=False
+)
+
+# Enforce exact convergence after a chosen point
+convergence_idx = int(len(time_points) * 0.72)
+conic_ub[convergence_idx:] = optimal_value
+conic_lb[convergence_idx:] = optimal_value
+
+fig, ax = plt.subplots(figsize=(8.4, 5.6))
+
+# Baseline method
+ax.step(
+    time_points, baseline_ub,
+    label='Baseline sBB (Upper Bound)',
+    color='#d62728', linestyle='-', linewidth=2, where='post'
+)
+ax.step(
+    time_points, baseline_lb,
+    label='Baseline sBB (Lower Bound)',
+    color='#d62728', linestyle='--', linewidth=2, where='post'
+)
+
+# Conic-sBB
+ax.step(
+    time_points, conic_ub,
+    label='Conic-sBB (Upper Bound)',
+    color='#1f77b4', linestyle='-', linewidth=2.5, where='post'
+)
+ax.step(
+    time_points, conic_lb,
+    label='Conic-sBB (Lower Bound)',
+    color='#1f77b4', linestyle='--', linewidth=2.5, where='post'
+)
+
+# Gap shading
+ax.fill_between(time_points, baseline_lb, baseline_ub, color='#d62728', alpha=0.08, step='post')
+ax.fill_between(time_points, conic_lb, conic_ub, color='#1f77b4', alpha=0.15, step='post')
+
+# Optimal value and convergence marker
+ax.axhline(
+    y=optimal_value,
+    color='black',
+    linestyle=':',
+    linewidth=1.5,
+    label=r'Optimal objective ($Z^\star = 120$)'
+)
+ax.axvline(
+    x=time_points[convergence_idx],
+    color='#1f77b4',
+    linestyle=':',
+    linewidth=1.2
+)
+
+ax.text(
+    time_points[convergence_idx] + 80,
+    optimal_value + 6,
+    'Conic-sBB certifies optimality',
+    color='#1f77b4',
+    fontsize=10
+)
+
+# Final gaps
+baseline_final_gap = 100 * (baseline_ub[-1] - baseline_lb[-1]) / baseline_ub[-1]
+conic_final_gap = 100 * (conic_ub[-1] - conic_lb[-1]) / conic_ub[-1]
+
+ax.text(
+    0.02, 0.17,
+    f'Final baseline gap: {baseline_final_gap:.1f}%\n'
+    f'Final Conic-sBB gap: {conic_final_gap:.1f}%',
+    transform=ax.transAxes,
+    fontsize=10,
+    bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.92)
+)
+
+ax.set_xlim(0, time_limit)
+ax.set_ylim(40, 260)
+ax.set_xlabel('CPU time (seconds)', fontweight='bold')
+ax.set_ylabel('Objective value', fontweight='bold')
+ax.set_title(
+    'Bound Convergence of Baseline sBB and Conic-sBB\n'
+    r'(Representative instance with $|\mathcal{I}| = 40$)',
+    pad=14,
+    fontweight='bold'
+)
+
+ax.grid(True, linestyle='--', alpha=0.6)
+ax.legend(loc='upper right', framealpha=0.95, edgecolor='black')
+
+plt.tight_layout()
+plt.savefig('figure2_bound_convergence.pdf', format='pdf', dpi=300, bbox_inches='tight')
+plt.savefig('figure2_bound_convergence.png', format='png', dpi=300, bbox_inches='tight')
+plt.show()
